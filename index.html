@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dibujo en Canvas</title>
+  <style>
+    canvas {
+      border: 1px solid black;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="drawCanvas" width="800" height="600"></canvas>
+
+  <button id="triangle">triangle</button>
+
+  <script>
+    // Configuración inicial
+    const btn = document.getElementById('triangle')
+    const canvas = document.getElementById('drawCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let isDrawing = false;
+    let prevPos = { x: 0, y: 0 };
+    let currentColor = 'black';
+    let currentThickness = 4.0;
+    let drawPoints = []; // Almacena los segmentos de línea (posición inicial, posición final, color, grosor)
+    let canDraw = false;
+
+    function calculateDistance(player, reference) {
+      return Math.sqrt(Math.pow(reference.x - player.x, 2) + Math.pow(reference.y - player.y, 2));
+    }
+
+    // Función para calcular la precisión
+    function calculateAccuracy(playerPoints) {
+      let totalDistance = 0;
+      const referencePoints = getTrianglePoints();
+
+
+      for (const p1 of playerPoints) {
+        const radius = currentThickness * 10; // Radio del punto del jugador basado en el grosor
+        let minDistance = Infinity; // Inicializa la distancia mínima a infinito debido a que se desconoce la distancia más corta
+
+        for (const p2 of referencePoints) {
+          const distance = calculateDistance(p1, p2);
+
+          // Si el punto está dentro del área del grosor, considera la distancia como 0
+          if (distance <= radius) {
+            minDistance = 0;
+            break;
+          }
+
+          if (distance < minDistance) {
+            minDistance = distance;
+          }
+        }
+        totalDistance += minDistance; // Suma la distancia más corta para este punto
+      }
+
+      // Calcula la distancia promedio
+      const averageDistance = totalDistance / playerPoints.length;
+
+      return averageDistance; // Devuelve qué tan lejos están en promedio
+    }
+
+    const getTrianglePoints = () => {
+      const pointA = { x: 200, y: 100, }; // Primer vértice del triángulo
+      const pointB = { x: 300, y: 300, }; // Segundo vértice del triángulo
+      const pointC = { x: 100, y: 300, }; // Tercer vértice del triángulo
+      const pointSpacing = 5; // Espaciado entre puntos
+      const trianglePoints = []; // Array para almacenar todos los puntos del triángulo
+
+      // Función para calcular puntos entre dos coordenadas
+      function calculateLinePoints(start, end) {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const steps = Math.ceil(distance / pointSpacing);
+        const xIncrement = dx / steps;
+        const yIncrement = dy / steps;
+
+        const linePoints = [];
+        for (let i = 0; i <= steps; i++) {
+          const x = start.x + i * xIncrement;
+          const y = start.y + i * yIncrement;
+          linePoints.push({ x, y });
+        }
+        return linePoints;
+      }
+
+      trianglePoints.push(...calculateLinePoints(pointC, pointA)); // Lado CA
+      trianglePoints.push(...calculateLinePoints(pointA, pointB)); // Lado AB
+      trianglePoints.push(...calculateLinePoints(pointB, pointC)); // Lado BC
+
+      return trianglePoints
+    }
+
+    btn.addEventListener('click', () => {
+      // Dibujar el triángulo punto por punto usando moveTo y lineTo
+      const trianglePoints = getTrianglePoints()
+
+      ctx.beginPath();
+      for (let i = 0; i < trianglePoints.length - 1; i++) {
+        const start = trianglePoints[i];
+        const end = trianglePoints[i + 1];
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+      }
+      ctx.strokeStyle = currentColor;
+      ctx.lineWidth = currentThickness;
+      ctx.stroke();
+
+    });
+
+
+    // Establece el color y grosor de la línea
+    function setColor(newColor) {
+      currentColor = newColor;
+    }
+
+    function setThickness(newThickness) {
+      currentThickness = newThickness;
+    }
+
+    // Manejo de la tecla de espacio para activar/desactivar el modo de dibujo
+    window.addEventListener('keydown', function (event) {
+      if (event.key === ' ' && event.repeat === false) {
+        canDraw = true;
+      }
+    });
+
+    window.addEventListener('keyup', () => {
+      if (event.key === ' ' && event.repeat === false) {
+        canDraw = false;
+
+        drawPoints = [];
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    })
+
+    // Detecta el mouse
+    canvas.addEventListener('mousedown', function (event) {
+      if (canDraw) {
+        isDrawing = true;
+        prevPos = { x: event.offsetX, y: event.offsetY };  // Almacena la posición inicial
+      }
+    });
+
+    canvas.addEventListener('mouseup', function () {
+      isDrawing = false;
+
+      const accuracy = calculateAccuracy(drawPoints.map(e => ({ x: e.start.x, y: e.start.y })));
+
+      console.log('Precisión del dibujo (distancia promedio):', accuracy);
+    });
+
+    canvas.addEventListener('mousemove', function (event) {
+      if (isDrawing) {
+        const currentPos = { x: event.offsetX, y: event.offsetY };
+        drawPoints.push({
+          start: prevPos,
+          end: currentPos,
+          color: currentColor,
+          thickness: currentThickness
+        });
+        prevPos = currentPos;
+        redraw();
+      }
+    });
+
+    // Función para dibujar en el lienzo
+    function redraw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpia el lienzo
+      for (const point of drawPoints) {
+        ctx.beginPath();
+        ctx.moveTo(point.start.x, point.start.y);
+        ctx.lineTo(point.end.x, point.end.y);
+        ctx.strokeStyle = point.color;
+        ctx.lineWidth = point.thickness;
+        ctx.stroke();
+      }
+      // Dibujar el triángulo punto por punto usando moveTo y lineTo
+      const trianglePoints = getTrianglePoints()
+
+      ctx.beginPath();
+      for (let i = 0; i < trianglePoints.length - 1; i++) {
+        const start = trianglePoints[i];
+        const end = trianglePoints[i + 1];
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+      }
+      ctx.strokeStyle = currentColor;
+      ctx.lineWidth = currentThickness;
+      ctx.stroke();
+    }
+
+    // Dibuja las líneas guardadas cuando se carga la página
+    redraw();
+  </script>
+</body>
+
+</html>
