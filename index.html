@@ -2,204 +2,228 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dibujo en Canvas</title>
-  <style>
-    canvas {
-      border: 1px solid black;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Práctica de Runas</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            display: block;
+            margin: 20px auto;
+            touch-action: none;
+            /* Deshabilitar gestos en táctiles */
+        }
+
+        button {
+            display: block;
+            margin: 10px auto;
+        }
+
+        #result {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+    </style>
 </head>
 
 <body>
-  <canvas id="drawCanvas" width="800" height="600"></canvas>
+    <h1 style="text-align: center;">Práctica de Runas</h1>
+    <canvas id="drawingCanvas" width="300" height="300"></canvas>
+    <button id="clearCanvas">Limpiar</button>
+    <button id="nextShape">Siguiente Figura</button>
+    <p id="result"></p>
+    <script>
+        // Configuración del canvas
+        const canvas = document.getElementById("drawingCanvas");
+        const ctx = canvas.getContext("2d");
+        let drawing = false;
+        let points = [];
+        let currentShapeIndex = 0;
 
-  <button id="triangle">triangle</button>
+        // Figuras de referencia
+        const shapes = [
+            [
+                { x: 50, y: 50 },
+                { x: 150, y: 50 },
+                { x: 150, y: 150 },
+                { x: 50, y: 150 },
+                { x: 50, y: 50 } // Cierre del cuadrado
+            ],
+            [
+                { x: 75, y: 50 },
+                { x: 125, y: 50 },
+                { x: 150, y: 100 },
+                { x: 125, y: 150 },
+                { x: 75, y: 150 },
+                { x: 50, y: 100 },
+                { x: 75, y: 50 } // Cierre del hexágono
+            ],
+            [
+                { x: 100, y: 50 },
+                { x: 150, y: 150 },
+                { x: 50, y: 150 },
+                { x: 100, y: 50 } // Cierre del triángulo
+            ]
+        ];
 
-  <script>
-    // Configuración inicial
-    const btn = document.getElementById('triangle')
-    const canvas = document.getElementById('drawCanvas');
-    const ctx = canvas.getContext('2d');
+        // Dibujar la figura de referencia
+        function drawPlaceholder(shape) {
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = "rgba(128, 128, 128, 0.5)";
+            ctx.lineWidth = 2;
 
-    let isDrawing = false;
-    let prevPos = { x: 0, y: 0 };
-    let currentColor = 'black';
-    let currentThickness = 4.0;
-    let drawPoints = []; // Almacena los segmentos de línea (posición inicial, posición final, color, grosor)
-    let canDraw = false;
-
-    function calculateDistance(player, reference) {
-      return Math.sqrt(Math.pow(reference.x - player.x, 2) + Math.pow(reference.y - player.y, 2));
-    }
-
-    // Función para calcular la precisión
-    function calculateAccuracy(playerPoints) {
-      let totalDistance = 0;
-      const referencePoints = getTrianglePoints();
-
-
-      for (const p1 of playerPoints) {
-        const radius = currentThickness * 10; // Radio del punto del jugador basado en el grosor
-        let minDistance = Infinity; // Inicializa la distancia mínima a infinito debido a que se desconoce la distancia más corta
-
-        for (const p2 of referencePoints) {
-          const distance = calculateDistance(p1, p2);
-
-          // Si el punto está dentro del área del grosor, considera la distancia como 0
-          if (distance <= radius) {
-            minDistance = 0;
-            break;
-          }
-
-          if (distance < minDistance) {
-            minDistance = distance;
-          }
+            ctx.beginPath();
+            ctx.moveTo(shape[0].x, shape[0].y);
+            for (let i = 1; i < shape.length; i++) {
+                ctx.lineTo(shape[i].x, shape[i].y);
+            }
+            ctx.stroke();
+            ctx.restore();
         }
-        totalDistance += minDistance; // Suma la distancia más corta para este punto
-      }
 
-      // Calcula la distancia promedio
-      const averageDistance = totalDistance / playerPoints.length;
+        // Iniciar el dibujo
+        canvas.addEventListener("mousedown", startDrawing);
+        canvas.addEventListener("touchstart", startDrawing);
 
-      return averageDistance; // Devuelve qué tan lejos están en promedio
-    }
-
-    const getTrianglePoints = () => {
-      const pointA = { x: 200, y: 100, }; // Primer vértice del triángulo
-      const pointB = { x: 300, y: 300, }; // Segundo vértice del triángulo
-      const pointC = { x: 100, y: 300, }; // Tercer vértice del triángulo
-      const pointSpacing = 5; // Espaciado entre puntos
-      const trianglePoints = []; // Array para almacenar todos los puntos del triángulo
-
-      // Función para calcular puntos entre dos coordenadas
-      function calculateLinePoints(start, end) {
-        const dx = end.x - start.x;
-        const dy = end.y - start.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const steps = Math.ceil(distance / pointSpacing);
-        const xIncrement = dx / steps;
-        const yIncrement = dy / steps;
-
-        const linePoints = [];
-        for (let i = 0; i <= steps; i++) {
-          const x = start.x + i * xIncrement;
-          const y = start.y + i * yIncrement;
-          linePoints.push({ x, y });
+        function startDrawing(event) {
+            drawing = true;
+            points = [];
+            ctx.beginPath();
+            const { x, y } = getCanvasCoordinates(event);
+            ctx.moveTo(x, y);
+            points.push({ x, y });
         }
-        return linePoints;
-      }
 
-      trianglePoints.push(...calculateLinePoints(pointC, pointA)); // Lado CA
-      trianglePoints.push(...calculateLinePoints(pointA, pointB)); // Lado AB
-      trianglePoints.push(...calculateLinePoints(pointB, pointC)); // Lado BC
+        // Dibujar
+        canvas.addEventListener("mousemove", draw);
+        canvas.addEventListener("touchmove", draw);
 
-      return trianglePoints
-    }
+        function draw(event) {
+            if (!drawing) return;
+            const { x, y } = getCanvasCoordinates(event);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            points.push({ x, y });
+        }
 
-    btn.addEventListener('click', () => {
-      // Dibujar el triángulo punto por punto usando moveTo y lineTo
-      const trianglePoints = getTrianglePoints()
+        // Detener el dibujo
+        canvas.addEventListener("mouseup", stopDrawing);
+        canvas.addEventListener("mouseleave", stopDrawing);
+        canvas.addEventListener("touchend", stopDrawing);
 
-      ctx.beginPath();
-      for (let i = 0; i < trianglePoints.length - 1; i++) {
-        const start = trianglePoints[i];
-        const end = trianglePoints[i + 1];
-        ctx.moveTo(start.x, start.y);
-        ctx.lineTo(end.x, end.y);
-      }
-      ctx.strokeStyle = currentColor;
-      ctx.lineWidth = currentThickness;
-      ctx.stroke();
+        function stopDrawing() {
+            drawing = false;
+            ctx.closePath();
+            checkShape();
+        }
 
-    });
+        // Obtener coordenadas en el canvas
+        function getCanvasCoordinates(event) {
+            const rect = canvas.getBoundingClientRect();
+            const isTouch = event.touches && event.touches[0];
+            const clientX = isTouch ? event.touches[0].clientX : event.clientX;
+            const clientY = isTouch ? event.touches[0].clientY : event.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top,
+            };
+        }
 
+        // Normalizar puntos
+        function normalizeShape(points, numPoints = 32) {
+            if (points.length < 2) return points; // Evitar errores
+            const totalLength = points.reduce((sum, _, i, arr) => {
+                if (i === 0) return 0;
+                const dx = arr[i].x - arr[i - 1].x;
+                const dy = arr[i].y - arr[i - 1].y;
+                return sum + Math.sqrt(dx * dx + dy * dy);
+            }, 0);
 
-    // Establece el color y grosor de la línea
-    function setColor(newColor) {
-      currentColor = newColor;
-    }
+            const interval = totalLength / (numPoints - 1);
+            let currentLength = 0;
+            const resampled = [points[0]];
 
-    function setThickness(newThickness) {
-      currentThickness = newThickness;
-    }
+            for (let i = 1; i < points.length; i++) {
+                const dx = points[i].x - points[i - 1].x;
+                const dy = points[i].y - points[i - 1].y;
+                const segmentLength = Math.sqrt(dx * dx + dy * dy);
 
-    // Manejo de la tecla de espacio para activar/desactivar el modo de dibujo
-    window.addEventListener('keydown', function (event) {
-      if (event.key === ' ' && event.repeat === false) {
-        canDraw = true;
-      }
-    });
+                while (currentLength + segmentLength >= interval) {
+                    const t = (interval - currentLength) / segmentLength;
+                    resampled.push({
+                        x: points[i - 1].x + t * dx,
+                        y: points[i - 1].y + t * dy,
+                    });
+                    currentLength -= interval;
+                }
+                currentLength += segmentLength;
+            }
 
-    window.addEventListener('keyup', () => {
-      if (event.key === ' ' && event.repeat === false) {
-        canDraw = false;
+            if (resampled.length < numPoints) {
+                resampled.push(points[points.length - 1]);
+            }
 
-        drawPoints = [];
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-    })
+            return resampled;
+        }
 
-    // Detecta el mouse
-    canvas.addEventListener('mousedown', function (event) {
-      if (canDraw) {
-        isDrawing = true;
-        prevPos = { x: event.offsetX, y: event.offsetY };  // Almacena la posición inicial
-      }
-    });
+        // Comparar formas
+        function compareShapes(shape1, shape2) {
+            if (shape1.length === 0 || shape2.length === 0) return Infinity;
+            const n = shape1.length;
+            const m = shape2.length;
+            const cost = Array.from({ length: n }, () => Array(m).fill(Infinity));
 
-    canvas.addEventListener('mouseup', function () {
-      isDrawing = false;
+            cost[0][0] = Math.sqrt(
+                (shape1[0].x - shape2[0].x) ** 2 + (shape1[0].y - shape2[0].y) ** 2
+            );
 
-      const accuracy = calculateAccuracy(drawPoints.map(e => ({ x: e.start.x, y: e.start.y })));
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < m; j++) {
+                    if (i === 0 && j === 0) continue;
+                    const dist = Math.sqrt(
+                        (shape1[i].x - shape2[j].x) ** 2 +
+                        (shape1[i].y - shape2[j].y) ** 2
+                    );
+                    const prevCosts = [
+                        i > 0 ? cost[i - 1][j] : Infinity,
+                        j > 0 ? cost[i][j - 1] : Infinity,
+                        i > 0 && j > 0 ? cost[i - 1][j - 1] : Infinity,
+                    ];
+                    cost[i][j] = dist + Math.min(...prevCosts);
+                }
+            }
+            return cost[n - 1][m - 1];
+        }
 
-      console.log('Precisión del dibujo (distancia promedio):', accuracy);
-    });
+        // Verificar coincidencia
+        function checkShape() {
+            const playerShape = normalizeShape(points);
+            const referenceShape = normalizeShape(shapes[currentShapeIndex]);
+            const similarity = compareShapes(playerShape, referenceShape);
+            console.log({ playerShape, referenceShape, similarity });
+            const threshold = 300; // Ajustar según precisión deseada
+            const resultText = similarity < threshold ? "¡Coincide!" : "No coincide, intenta de nuevo.";
+            document.getElementById("result").textContent = resultText;
+        }
 
-    canvas.addEventListener('mousemove', function (event) {
-      if (isDrawing) {
-        const currentPos = { x: event.offsetX, y: event.offsetY };
-        drawPoints.push({
-          start: prevPos,
-          end: currentPos,
-          color: currentColor,
-          thickness: currentThickness
+        // Cambiar a la siguiente figura
+        document.getElementById("nextShape").addEventListener("click", () => {
+            currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
+            drawPlaceholder(shapes[currentShapeIndex]);
+            document.getElementById("result").textContent = "";
         });
-        prevPos = currentPos;
-        redraw();
-      }
-    });
 
-    // Función para dibujar en el lienzo
-    function redraw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpia el lienzo
-      for (const point of drawPoints) {
-        ctx.beginPath();
-        ctx.moveTo(point.start.x, point.start.y);
-        ctx.lineTo(point.end.x, point.end.y);
-        ctx.strokeStyle = point.color;
-        ctx.lineWidth = point.thickness;
-        ctx.stroke();
-      }
-      // Dibujar el triángulo punto por punto usando moveTo y lineTo
-      const trianglePoints = getTrianglePoints()
+        // Botón para limpiar
+        document.getElementById("clearCanvas").addEventListener("click", () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPlaceholder(shapes[currentShapeIndex]);
+        });
 
-      ctx.beginPath();
-      for (let i = 0; i < trianglePoints.length - 1; i++) {
-        const start = trianglePoints[i];
-        const end = trianglePoints[i + 1];
-        ctx.moveTo(start.x, start.y);
-        ctx.lineTo(end.x, end.y);
-      }
-      ctx.strokeStyle = currentColor;
-      ctx.lineWidth = currentThickness;
-      ctx.stroke();
-    }
-
-    // Dibuja las líneas guardadas cuando se carga la página
-    redraw();
-  </script>
+        // Dibujar la primera figura al cargar la página
+        drawPlaceholder(shapes[currentShapeIndex]);
+    </script>
 </body>
 
 </html>
